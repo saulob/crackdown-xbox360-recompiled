@@ -19,7 +19,10 @@ void TestMenuEntriesFollowTheSpecifiedLayout() {
                             "Infinite Ammo",
                             "VEHICLE",
                             "Infinite Vehicle Health",
-                            "Vehicle Speed"};
+                            "Vehicle Speed",
+                            "MAP",
+                            "Agility Orbs on Map",
+                            "Hidden Orbs on Map"};
   CHECK(kMenuEntries.size() == std::size(expected));
   for (size_t i = 0; i < kMenuEntries.size(); ++i) {
     CHECK(std::strcmp(kMenuEntries[i].label, expected[i]) == 0);
@@ -82,6 +85,23 @@ void TestToggleCyclesBetweenOffAndOn() {
   CHECK(Cycle(Cheat::InfiniteHealth) == 0);
   CHECK(std::strcmp(ValueLabel(Kind::Toggle, 1), "On") == 0);
   CHECK(std::strcmp(ValueLabel(Kind::Toggle, 0), "Off") == 0);
+  ResetSession();
+}
+
+void TestMapDisplayCyclesOffMinimapWorldAndBack() {
+  for (const Cheat cheat : {Cheat::AgilityOrbsOnMap, Cheat::HiddenOrbsOnMap}) {
+    ResetSession();
+    SetSavedValue(cheat, kMapOff);
+    CHECK(Cycle(cheat) == kMapMinimap);
+    CHECK(Cycle(cheat) == kMapMinimapAndWorld);
+    CHECK(Cycle(cheat) == kMapOff);
+    CHECK(!Enabled(cheat));
+    SetSavedValue(cheat, 3);  // not offered: counts as Off
+    CHECK(Value(cheat) == kMapOff);
+  }
+  CHECK(std::strcmp(ValueLabel(Kind::MapDisplay, kMapOff), "Off") == 0);
+  CHECK(std::strcmp(ValueLabel(Kind::MapDisplay, kMapMinimap), "Minimap") == 0);
+  CHECK(std::strcmp(ValueLabel(Kind::MapDisplay, kMapMinimapAndWorld), "Minimap + World") == 0);
   ResetSession();
 }
 
@@ -239,6 +259,7 @@ int main() {
   TestMovementAndJumpCycleOffTo10xAndBack();
   TestVehicleSpeedStopsAt6x();
   TestToggleCyclesBetweenOffAndOn();
+  TestMapDisplayCyclesOffMinimapWorldAndBack();
   TestSavedOnBecomesTheStartingValue();
   TestSessionChangeDoesNotChangeTheSavedValue();
   TestResetSessionRestoresTheSavedValue();

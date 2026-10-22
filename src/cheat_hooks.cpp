@@ -77,15 +77,6 @@ std::atomic<bool> g_available{false};
 
 bool SinglePlayer(uint8_t* base) { return Load32(base, kCoopSessionGlobal) == 0; }
 
-uint32_t LocalPlayerCharacter(uint8_t* base) {
-  const uint32_t controller = Load32(base, kPlayerControllerGlobal);
-  if (!Plausible(controller)) {
-    return 0;
-  }
-  const uint32_t subobject = Load32(base, controller + kCharacterOffsetInController);
-  return Plausible(subobject) ? subobject - kCharacterBase : 0;
-}
-
 bool ActsOn(uint8_t* base, Cheat cheat, uint32_t entity) {
   return Enabled(cheat) && entity && SinglePlayer(base) && entity == LocalPlayerCharacter(base);
 }
@@ -235,6 +226,15 @@ void KeepClip(PPCContext& ctx, uint8_t* base, Cheat cheat, GuestFunction origina
 }  // namespace
 
 bool Available() { return g_available.load(std::memory_order_relaxed); }
+
+uint32_t LocalPlayerCharacter(uint8_t* base) {
+  const uint32_t controller = Load32(base, kPlayerControllerGlobal);
+  if (!Plausible(controller)) {
+    return 0;
+  }
+  const uint32_t subobject = Load32(base, controller + kCharacterOffsetInController);
+  return Plausible(subobject) ? subobject - kCharacterBase : 0;
+}
 
 void RunGameTick(uint8_t* base) {
   const uint32_t character = LocalPlayerCharacter(base);

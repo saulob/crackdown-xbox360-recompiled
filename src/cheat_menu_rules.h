@@ -23,7 +23,18 @@ struct MenuEntry {
   const char* label;
 };
 
-inline constexpr size_t kMenuEntryCount = kCheatCount + 3;
+// One heading per run of cheats in the same section.
+constexpr size_t CountSections() {
+  size_t sections = 0;
+  for (size_t i = 0; i < kCheatCount; ++i) {
+    if (i == 0 || kCheats[i].section != kCheats[i - 1].section) {
+      ++sections;
+    }
+  }
+  return sections;
+}
+
+inline constexpr size_t kMenuEntryCount = kCheatCount + CountSections();
 
 constexpr std::array<MenuEntry, kMenuEntryCount> MakeMenuEntries() {
   std::array<MenuEntry, kMenuEntryCount> entries{};

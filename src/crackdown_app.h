@@ -40,6 +40,7 @@
 #include "log_path.h"
 #include "main_menu_quit.h"
 #include "mouse_look.h"
+#include "orb_map.h"
 #include "platform.h"
 #include "session_log.h"
 #include "settings.h"
@@ -242,6 +243,7 @@ class CrackdownApp : public rex::ReXApp {
     crackdown::mouse_look::Configure();
     if (imgui_drawer()) {
       crackdown::CreateFrameCounter(imgui_drawer());
+      crackdown::orb_map::CreateOverlay(imgui_drawer());
       CreateCursorSync(imgui_drawer());
     }
     game_settings_.MarkRuntimeBuilt();

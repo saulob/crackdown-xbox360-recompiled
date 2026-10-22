@@ -1,0 +1,1 @@
+crackdown_add_test(orb_map_rules_tests SOURCES orb_map_rules_tests.cpp)

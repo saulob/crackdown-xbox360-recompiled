@@ -45,7 +45,7 @@ Crackdown Recompiled is a native PC recompilation of Crackdown for Xbox 360, wit
 
 ### Quality of Life
 - **Offline achievements** with the original icons and Gamerscore: an **Achievements** page in the launcher and an in-game overlay on **F7**, usable with keyboard or controller.
-- **Cheats**: 7 optional cheats set on the launcher's **Cheats** page, and changed for the session with the in-game menu on **F10**.
+- **Cheats**: 9 optional cheats set on the launcher's **Cheats** page, and changed for the session with the in-game menu on **F10**, including markers for the agility and hidden orbs you have not collected yet on the minimap and the pause menu's map.
 - **Save-load fix**: the crash that could happen after Loading Saved Game is fixed.
 - **High frame rate fixes**: above 30 FPS, no more launches on slopes or off ledges, no speed build-up running down
   stairs and slopes, fewer characters stuck in walls, rockets and grenade rounds explode on impact again, and the
@@ -152,6 +152,7 @@ Optional gameplay modifiers, all off by default. They start with the values save
 - **Infinite Health**, **No Fall Damage**, **Infinite Ammo** and **Infinite Vehicle Health** (the vehicle you drive): Off or On
 - **Movement Speed** and **Jump Height**: Off, 2x, 4x, 6x, 8x or 10x
 - **Vehicle Speed**: Off, 2x, 4x or 6x
+- **Agility Orbs on Map** and **Hidden Orbs on Map**: Off, Minimap, or Minimap + World. Marks the orbs you have not collected yet, green for agility and magenta for hidden, on the minimap and, with Minimap + World, on the pause menu's city and district maps.
 
 ### Controls
 - Xbox and XInput controllers work without setup; any connected pad can press Start

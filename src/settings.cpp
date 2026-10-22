@@ -62,6 +62,10 @@ REXCVAR_DEFINE_BOOL(cheat_no_fall_damage, false, "Crackdown", "No Fall Damage ch
 REXCVAR_DEFINE_BOOL(cheat_infinite_ammo, false, "Crackdown", "Infinite Ammo cheat");
 REXCVAR_DEFINE_BOOL(cheat_infinite_vehicle_health, false, "Crackdown", "Infinite Vehicle Health cheat");
 REXCVAR_DEFINE_INT32(cheat_vehicle_speed, 0, "Crackdown", "Vehicle Speed cheat: 0 (Off), 2, 4 or 6");
+REXCVAR_DEFINE_INT32(cheat_agility_orbs_on_map, 0, "Crackdown",
+                     "Uncollected agility orbs: 0 (Off), 1 (Minimap) or 2 (Minimap and world map)");
+REXCVAR_DEFINE_INT32(cheat_hidden_orbs_on_map, 0, "Crackdown",
+                     "Uncollected hidden orbs: 0 (Off), 1 (Minimap) or 2 (Minimap and world map)");
 REXCVAR_DEFINE_BOOL(crackdown_launcher_fullscreen, false, "Crackdown",
                     "Launcher was left in its own F11 fullscreen, written by the launcher");
 
@@ -100,6 +104,8 @@ const std::vector<std::string> kGameSettingKeys = [] {
       "cheat_infinite_ammo",
       "cheat_infinite_vehicle_health",
       "cheat_vehicle_speed",
+      "cheat_agility_orbs_on_map",
+      "cheat_hidden_orbs_on_map",
   };
   for (const KeyboardAction& action : kKeyboardActions) {
     keys.emplace_back(action.key);
@@ -224,6 +230,8 @@ void SyncSavedCheats() {
   cheats::SetSavedValue(Cheat::InfiniteAmmo, REXCVAR_GET(cheat_infinite_ammo) ? 1 : 0);
   cheats::SetSavedValue(Cheat::InfiniteVehicleHealth, REXCVAR_GET(cheat_infinite_vehicle_health) ? 1 : 0);
   cheats::SetSavedValue(Cheat::VehicleSpeed, REXCVAR_GET(cheat_vehicle_speed));
+  cheats::SetSavedValue(Cheat::AgilityOrbsOnMap, REXCVAR_GET(cheat_agility_orbs_on_map));
+  cheats::SetSavedValue(Cheat::HiddenOrbsOnMap, REXCVAR_GET(cheat_hidden_orbs_on_map));
 }
 
 WindowPlacement SavedLauncherPlacement() {

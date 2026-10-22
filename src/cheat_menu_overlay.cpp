@@ -94,6 +94,10 @@ void CheatMenuOverlay::DrawEntry(const cheats::MenuEntry& entry, int row, float 
   ImDrawList* draw = ImGui::GetWindowDrawList();
   if (selected_ == row) {
     draw->AddRectFilled(min, max, ImGui::GetColorU32(focus), 3.0f * scale);
+    // On a window too short for every row, the panel scrolls to keep the selection in view.
+    if (!ImGui::IsRectVisible(min, max)) {
+      ImGui::SetScrollHereY();
+    }
   }
   const float pad = ImGui::GetFontSize() * 0.4f;
   const float y = min.y + (height - ImGui::GetFontSize()) * 0.5f;

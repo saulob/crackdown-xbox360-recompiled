@@ -39,6 +39,8 @@ REXCVAR_DECLARE(bool, cheat_no_fall_damage);
 REXCVAR_DECLARE(bool, cheat_infinite_ammo);
 REXCVAR_DECLARE(bool, cheat_infinite_vehicle_health);
 REXCVAR_DECLARE(int32_t, cheat_vehicle_speed);
+REXCVAR_DECLARE(int32_t, cheat_agility_orbs_on_map);
+REXCVAR_DECLARE(int32_t, cheat_hidden_orbs_on_map);
 
 namespace crackdown {
 

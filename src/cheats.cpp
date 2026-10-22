@@ -26,6 +26,9 @@ const char* ValueLabel(Kind kind, int value) {
   if (kind == Kind::Toggle) {
     return "On";
   }
+  if (kind == Kind::MapDisplay) {
+    return value == kMapMinimap ? "Minimap" : "Minimap + World";
+  }
   switch (value) {
     case 2:
       return "2x";

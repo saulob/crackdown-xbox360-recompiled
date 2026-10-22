@@ -33,4 +33,6 @@ inline void StoreFloat(uint8_t* base, uint32_t addr, float value) { Store32(base
 
 inline uint8_t Load8(uint8_t* base, uint32_t addr) { return *rex::memory::GuestPtr<const uint8_t*>(base, addr); }
 
+inline void Store8(uint8_t* base, uint32_t addr, uint8_t value) { *rex::memory::GuestPtr<uint8_t*>(base, addr) = value; }
+
 }  // namespace crackdown::guest
