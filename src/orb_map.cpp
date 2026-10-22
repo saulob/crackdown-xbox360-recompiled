@@ -24,6 +24,7 @@
 
 REX_EXTERN(__imp__sub_824EFD98);
 REX_EXTERN(__imp__sub_824EFE68);
+REX_EXTERN(__imp__sub_823E9490);
 REX_EXTERN(__imp__sub_823E96F8);
 REX_EXTERN(__imp__sub_823E9C30);
 REX_EXTERN(__imp__sub_826400D8);
@@ -65,7 +66,8 @@ constexpr uint32_t kMarkerY = 8;
 constexpr uint32_t kMarkerShown = 12;
 constexpr uint32_t kMarkerInside = 856;
 constexpr uint32_t kMarkerDescriptor = 872;
-// Descriptor whose position getter (sub_823E96F8) is overridden while an orb is projected.
+// The supply point descriptor every marker gets. Its "shown" check (sub_823E9490) and position getter (sub_823E96F8)
+// are overridden while an orb is projected, so the orbs show even when the game hides that supply point.
 constexpr uint32_t kListDescriptorVtable = 0x820A83C8;
 // The marker's icon image: +140/+144 is where the HUD last drew it, so taking away the marker's position gives the
 // minimap's centre.
@@ -109,9 +111,11 @@ constexpr float kSupplyPointClearance = 7.0f;
 // by sub_82627528(screen) and torn down by sub_82627640(screen + 136). A view belongs to the screen on top when it was
 // built, and its dots show only while that screen is still on top, so a menu or fade over it hides them. Screens are
 // only built and torn down around menus and fades, never during play, so the minimap's dots wait out the fades for a
-// moment after each change.
+// moment after each change. A screen built with none left is a load, such as leaving a supply point: the game updates
+// the minimap under the Agency logo that plays then, so the dots wait for the logo and the fade after it.
 constexpr uint32_t kScreenDestructorOffset = 136;
 constexpr auto kScreenChangeQuiet = std::chrono::milliseconds(1500);
+constexpr auto kLoadQuiet = std::chrono::milliseconds(6000);
 
 constexpr auto kStaleAfter = std::chrono::milliseconds(150);
 
@@ -153,16 +157,26 @@ struct ViewInfo {
 std::vector<uint32_t> g_views;            // live views, oldest first, guarded by g_views_mutex
 std::map<uint32_t, ViewInfo> g_view_info;  // guarded by g_views_mutex
 std::vector<uint32_t> g_screens;          // live screens, oldest first, guarded by g_views_mutex
-std::atomic<Clock::rep> g_screen_changed{0};  // when a screen was last built or torn down, as Clock ticks
+std::atomic<Clock::rep> g_minimap_quiet_until{0};  // after a screen change, as Clock ticks
+
+// Hides the minimap's dots for `quiet` from now, unless they are already hidden for longer.
+void QuietMinimap(Clock::duration quiet) {
+  const Clock::rep until = (Clock::now() + quiet).time_since_epoch().count();
+  Clock::rep current = g_minimap_quiet_until.load();
+  while (current < until && !g_minimap_quiet_until.compare_exchange_weak(current, until)) {
+  }
+}
 
 // The projection override; set and read on the thread that runs the projection.
 thread_local bool t_override = false;
 thread_local uint32_t t_override_descriptor = 0;
 thread_local float t_override_x = 0.0f, t_override_z = 0.0f;
 thread_local uint32_t t_anchor = 0;
+thread_local bool t_anchor_shown = false;
 thread_local Clock::time_point t_anchor_seen;
 thread_local float t_anchor_x = NAN, t_anchor_y = NAN;
-thread_local float t_centre_x = NAN, t_centre_y = NAN;
+// The minimap's centre in the layout, measured in game; the HUD never moves it. Kept up to date from a shown marker.
+thread_local float t_centre_x = 211.5f, t_centre_y = 577.5f;
 
 bool ShowOnMinimap(cheats::Cheat cheat) { return cheats::Value(cheat) != cheats::kMapOff; }
 bool ShowOnMap(cheats::Cheat cheat) { return cheats::Value(cheat) == cheats::kMapMinimapAndWorld; }
@@ -195,11 +209,26 @@ void Restore(uint8_t* base, uint32_t marker, const SavedMarker& saved) {
   guest::Store8(base, marker + kMarkerInside, saved.inside);
 }
 
+// Takes the minimap's centre from where the shown marker's icon was last drawn.
+void UpdateCentre(uint8_t* base, uint32_t marker, const SavedMarker& saved) {
+  const float drawn_x = LoadFloat(base, marker + kMarkerIconImage + kImageDrawnX);
+  const float drawn_y = LoadFloat(base, marker + kMarkerIconImage + kImageDrawnY);
+  if (std::isfinite(drawn_x) && std::isfinite(drawn_y) && (drawn_x != 0.0f || drawn_y != 0.0f) &&
+      std::abs(saved.x - t_anchor_x) < kAnchorStill && std::abs(saved.y - t_anchor_y) < kAnchorStill) {
+    // The icon's corner is the minimap's centre plus the marker's position; the projected points sit half an icon
+    // further on.
+    t_centre_x = drawn_x - saved.x + 0.5f * LoadFloat(base, marker + kMarkerSizingImage + kImageWidth);
+    t_centre_y = drawn_y - saved.y + 0.5f * LoadFloat(base, marker + kMarkerSizingImage + kImageHeight);
+  }
+  t_anchor_x = saved.x;
+  t_anchor_y = saved.y;
+}
+
 // Re-runs the game's own projection for every nearby uncollected orb, using `marker` as a stand-in whose position
 // getter returns the orb's position, and restores the marker afterwards. `entry` is the context the projection was
-// called with and `after` the one it returned with.
-void ProjectOrbs(const PPCContext& entry, const PPCContext& after, uint8_t* base, uint32_t marker, bool show_agility,
-                 bool show_hidden) {
+// called with and `after` the one it returned with; `shown` is whether the game showed the marker itself.
+void ProjectOrbs(const PPCContext& entry, const PPCContext& after, uint8_t* base, uint32_t marker, bool shown,
+                 bool show_agility, bool show_hidden) {
   const uint32_t character = cheats::LocalPlayerCharacter(base);
   if (!character) {
     return;
@@ -239,19 +268,12 @@ void ProjectOrbs(const PPCContext& entry, const PPCContext& after, uint8_t* base
   t_override = false;
   Restore(base, marker, saved);
 
-  const float drawn_x = LoadFloat(base, marker + kMarkerIconImage + kImageDrawnX);
-  const float drawn_y = LoadFloat(base, marker + kMarkerIconImage + kImageDrawnY);
-  if (std::isfinite(drawn_x) && std::isfinite(drawn_y) && (drawn_x != 0.0f || drawn_y != 0.0f) &&
-      std::abs(saved.x - t_anchor_x) < kAnchorStill && std::abs(saved.y - t_anchor_y) < kAnchorStill) {
-    // The icon's corner is the minimap's centre plus the marker's position; the projected points sit half an icon
-    // further on.
-    t_centre_x = drawn_x - saved.x + 0.5f * LoadFloat(base, marker + kMarkerSizingImage + kImageWidth);
-    t_centre_y = drawn_y - saved.y + 0.5f * LoadFloat(base, marker + kMarkerSizingImage + kImageHeight);
-  }
-  t_anchor_x = saved.x;
-  t_anchor_y = saved.y;
-  if (!std::isfinite(t_centre_x) || !std::isfinite(t_centre_y)) {
-    return;  // no centre yet
+  // The minimap's centre comes from where the marker's icon was drawn, so only a shown marker can update it. The
+  // centre does not move, so the last one stays good while no supply point is shown.
+  if (!shown) {
+    t_anchor_x = t_anchor_y = NAN;
+  } else {
+    UpdateCentre(base, marker, saved);
   }
   frame.origin_x = t_centre_x;
   frame.origin_y = t_centre_y;
@@ -373,13 +395,13 @@ class OrbMapOverlay final : public rex::ui::ImGuiDialog {
       return;
     }
     // A minimap not refreshed lately is not being drawn (menus, loading, cutscenes); a screen just changed means a
-    // fade is dimming it.
+    // fade or the logo is over it.
     const Clock::time_point now = Clock::now();
-    const Clock::time_point screen_changed{Clock::duration(g_screen_changed.load())};
+    const Clock::time_point quiet_until{Clock::duration(g_minimap_quiet_until.load())};
     Frame minimap;
     {
       std::lock_guard lock(g_minimap_mutex);
-      if (now - g_minimap.time <= kStaleAfter && now - screen_changed > kScreenChangeQuiet && cheats::Available()) {
+      if (now - g_minimap.time <= kStaleAfter && now > quiet_until && cheats::Available()) {
         minimap = g_minimap;
       }
     }
@@ -455,8 +477,8 @@ REX_HOOK_RAW(sub_82627528) {
   const uint32_t screen = ctx.r3.u32;
   __imp__sub_82627528(ctx, base);
   std::lock_guard lock(g_views_mutex);
+  QuietMinimap(g_screens.empty() ? kLoadQuiet : kScreenChangeQuiet);
   g_screens.push_back(screen);
-  g_screen_changed = Clock::now().time_since_epoch().count();
 }
 
 // Frontend screen base destructor: r3 = the screen + 136.
@@ -466,9 +488,19 @@ REX_HOOK_RAW(sub_82627640) {
     const uint32_t screen = ctx.r3.u32 - kScreenDestructorOffset;
     std::lock_guard lock(g_views_mutex);
     g_screens.erase(std::remove(g_screens.begin(), g_screens.end(), screen), g_screens.end());
-    g_screen_changed = Clock::now().time_since_epoch().count();
+    QuietMinimap(kScreenChangeQuiet);
   }
   __imp__sub_82627640(ctx, base);
+}
+
+// Supply point descriptor's "shown" check: r3 = the descriptor. Returns whether the marker shows.
+REX_HOOK_RAW(sub_823E9490) {
+  using namespace crackdown::orb_map;
+  if (t_override && ctx.r3.u32 == t_override_descriptor) {
+    ctx.r3.u64 = 1;
+    return;
+  }
+  __imp__sub_823E9490(ctx, base);
 }
 
 // List-entry descriptor position getter: r3 = out (x, z), r4 = the descriptor.
@@ -494,14 +526,18 @@ REX_HOOK_RAW(sub_823E9C30) {
   const PPCContext entry = ctx;
   const uint32_t marker = ctx.r3.u32;
   __imp__sub_823E9C30(ctx, base);
-  if (!(ctx.r3.u32 & 0xFF) || Load32(base, marker + kMarkerDescriptor) != kListDescriptorVtable) {
+  if (Load32(base, marker + kMarkerDescriptor) != kListDescriptorVtable) {
     return;
   }
   const Clock::time_point now = Clock::now();
-  if (marker != t_anchor && now - t_anchor_seen < kAnchorTimeout) {
-    return;  // one pass per frame, on the anchor marker
+  const bool shown = ctx.r3.u32 & 0xFF;
+  // One pass per frame, on the anchor marker. A shown marker takes over from a hidden one, since only a shown marker
+  // can measure the minimap's centre.
+  if (marker != t_anchor && now - t_anchor_seen < kAnchorTimeout && (t_anchor_shown || !shown)) {
+    return;
   }
   t_anchor = marker;
   t_anchor_seen = now;
-  ProjectOrbs(entry, ctx, base, marker, show_agility, show_hidden);
+  t_anchor_shown = shown;
+  ProjectOrbs(entry, ctx, base, marker, shown, show_agility, show_hidden);
 }
